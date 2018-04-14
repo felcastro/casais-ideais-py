@@ -15,11 +15,6 @@ class Gender(Enum):
     FEMALE = 1
 
 class Person(object):
-    personid = ""
-    gender = 0
-    interests = []
-    x = 0
-    y = 0
     
     def __init__(self, personid, gender, interests):
         self.personid = personid
@@ -40,12 +35,11 @@ class Agent (threading.Thread):
       startAgent(self.idx, self.delay)
           
 def startAgent(idx, delay):
-    i = 1
-    
     while True:
         newX = persons[idx].x
         newY = persons[idx].y
-        if randint(0, 1) > 0:
+        moveType = randint(0, 1)
+        if moveType == 0:
             if newX <= 0: 
                 newX += 1
             elif newX >= len(matrix[0]) - 1: 
@@ -66,21 +60,28 @@ def startAgent(idx, delay):
                 else:
                     newY -= 1
         threadLock.acquire()
-        os.system('clear')
         walked = walk(persons[idx].x, persons[idx].y, newX, newY)
+        os.system('clear')
         print(persons[idx])
+        print(matrixToString(matrix), flush=True)
         if walked:
             persons[idx].x = newX
             persons[idx].y = newY
-        print(matrixToString(matrix), flush=True)
         threadLock.release()
         time.sleep(delay)
-
+        
+def checkNearbyPartners(matrix, gender, x, y):
+    for i in range(-2, 3):
+        for j in range(-2, 3):
+            if matrix[y + i][x + j] == "X":
+                return [j, i]
+    return []
+            
 def matrixToString(matrix):
     return '\n'.join([''.join(['{:2}'.format(item) for item in row]) for row in matrix])
-
+    
 def translatePerson(personString, gender):
-    return Person(personString[0], gender, list(map(lambda x: int(x), personString[2:].split(" "))))
+    return Person(int(personString[0]), gender, list(map(lambda x: int(x), personString[2:].split(" "))))
 
 def walk(x, y, newX, newY):
     if matrix[newY][newX] in ["O", "R", "M", "F"]:
@@ -111,7 +112,8 @@ persons = [translatePerson(x, Gender.MALE) if ind < couples
 
 # 3. Position everything in the matrix.
 usedPositions = []
-registrysPositions = []
+obstaclePositions = []
+registryPositions = []
 
 # 3.1. Add obstacles to random positions on the matrix.
 matrixHalf = int(round(len(matrix) / 2))
@@ -132,19 +134,28 @@ while i < len(matrix):
     while j < bottomPosition:
         matrix[j][i] = "O"
         usedPositions.append([i, j])
+        obstaclePositions.append([i, j])
         j += 1
     i += obstacleSpacing
     
-# 3.2. Add each registry to a random not used position on the matrix.
-x = randint(0, len(matrix[0]) - 1)
-y = randint(0, len(matrix) - 1)
+# 3.2. Add each registry to a random not used position on the matrix 
+#      next to obstacles.
+
 for i in range(0, registrys):
-    while [x, y] in usedPositions:
-        x = randint(0, len(matrix[0]) - 1)
-        y = randint(0, len(matrix) - 1)
-    matrix[y][x] = "R"
-    usedPositions.append([x, y])
-    registrysPositions.append([x, y])
+    pos = obstaclePositions[randint(0, len(obstaclePositions) - 1)]
+    if randint(0, 1) > 0:
+        pos[0] += 1
+    else: 
+        pos[0] -= 1
+    while pos in usedPositions:
+        pos = obstaclePositions[randint(0, len(obstaclePositions) - 1)]
+        if randint(0, 1) > 0:
+            pos[0] += 1
+        else: 
+            pos[0] -= 1
+    matrix[pos[1]][pos[0]] = "R"
+    usedPositions.append(pos)
+    registryPositions.append(pos)
 
 # 3.3. Add each person to a random not used position on the matrix.
 x = randint(0, len(matrix[0]) - 1)
@@ -162,12 +173,26 @@ for i in range(0, len(persons)):
 #thread = Agent(0, 1)
 #thread.start()
 
-for i in range(0, len(persons)):
-    thread = Agent(i, 0.3)
-    thread.start()
+#for i in range(0, len(persons)):
+#    thread = Agent(i, 0.3)
+#    thread.start()
+    
 #print(matrixToString(matrix), flush=True)
 #print("\n")
 
+testMatrix = matrix = [["."] * 20 for _ in range(20)]
+testMatrix[9][9] = "O"
+testMatrix[9][11] = "X"
+testMatrix[7][8] = "X"
+testMatrix[10][9] = "X"
+testMatrix[8][10] = "X"
+testMatrix[11][11] = "X"
+testMatrix[10][7] = "X"
+
+checkNearbyPartners(testMatrix, "M", 9, 9)
+
+print(matrixToString(testMatrix))
+    
 from collections import deque
 
 class AStar:
