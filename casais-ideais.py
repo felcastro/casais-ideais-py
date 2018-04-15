@@ -4,11 +4,15 @@ import threading
 import time
 import os
 
-class Position(Enum):
-    EMPTY = 0
-    PERSON = 1
-    REGISTRY = 2
-    OBSTACLE = 3
+class Position(object):
+    
+    def __init__(self, posType, name):
+        self.posType = posType
+        self.name = name
+        self.f = 0
+        self.g = 0
+        self.h = 0
+        
 
 class Gender(Enum):
     MALE = 0
@@ -20,9 +24,10 @@ class Person(object):
         self.personid = personid
         self.gender = gender
         self.interests = interests
+        self.partner = 0
         
     def __repr__(self):
-        return "[%s, %s, %s, %s, %s]" % (self.personid, self.gender, self.interests, self.x, self.y)
+        return "[Id: %s, Genero: %s, Parceiro atual: %s, Interesses: %s, X atual: %s, Y atual: %s]" % (self.personid, self.gender.name.lower(), self.partner, self.interests, self.x, self.y)
         
 class Agent (threading.Thread):
     
@@ -61,45 +66,77 @@ def startAgent(idx, delay):
                     newY -= 1
         threadLock.acquire()
         walked = walk(persons[idx].x, persons[idx].y, newX, newY)
-        os.system('clear')
-        print(persons[idx])
-        print(matrixToString(matrix), flush=True)
         if walked:
             persons[idx].x = newX
             persons[idx].y = newY
+        try: 
+            checkNearbyPartners(idx, persons[idx].x, persons[idx].y)
+        except:
+            False
+        screen = "Agente atual: " + repr(persons[idx]) + "\n" + matrixToString(matrix) + "\n" + getStatus() + "\n" 
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print(screen)
         threadLock.release()
         time.sleep(delay)
         
-def checkNearbyPartners(matrix, gender, x, y):
-    for i in range(-2, 3):
-        for j in range(-2, 3):
-            if matrix[y + i][x + j] == "X":
-                return [j, i]
-    return []
+        
+def checkNearbyPartners(idx, x, y):
+    for p in persons:
+        if x - p.x in range(-2, 3) and y - p.y in range(-2, 3) and not p.gender == persons[idx].gender and not persons[idx].partner == p.personid:
+            if persons[idx].partner == 0 and p.partner == 0:
+                persons[idx].partner = p.personid
+                p.partner = persons[idx].personid
+            elif persons[idx].partner == 0 and p.interests.index(persons[idx].personid) < p.interests.index(p.partner):
+                for prsn in persons:
+                    if p.partner == prsn.personid and not p.gender == prsn.gender:
+                        prsn.partner = 0
+                persons[idx].partner = p.personid
+                p.partner = persons[idx].personid
+            elif p.partner == 0 and persons[idx].interests.index(p.personid) < persons[idx].interests.index(persons[idx].partner):
+                for prsn in persons:
+                    if persons[idx].partner == prsn.personid and not persons[idx].gender == prsn.gender:
+                        prsn.partner = 0
+                persons[idx].partner = p.personid
+                p.partner = persons[idx].personid
+            elif persons[idx].interests.index(p.personid) < persons[idx].interests.index(persons[idx].partner) and p.interests.index(persons[idx].personid) < p.interests.index(p.partner):
+                for prsn in persons:
+                    if persons[idx].partner == prsn.personid and not persons[idx].gender == prsn.gender:
+                        prsn.partner = 0
+                    elif p.partner == prsn.personid and not p.gender == prsn.gender:
+                        prsn.partner = 0
+                persons[idx].partner = p.personid
+                p.partner = persons[idx].personid
             
 def matrixToString(matrix):
-    return '\n'.join([''.join(['{:2}'.format(item) for item in row]) for row in matrix])
+    return '\n'.join([''.join(['{:2}'.format(item.name) for item in row]) for row in matrix])
     
 def translatePerson(personString, gender):
     return Person(int(personString[0]), gender, list(map(lambda x: int(x), personString[2:].split(" "))))
 
 def walk(x, y, newX, newY):
-    if matrix[newY][newX] in ["O", "R", "M", "F"]:
+    if matrix[newY][newX].posType in [1, 2, 3, 4]:
         return False
     elif 0 > newX > len(matrix) - 1 or 0 > newY > len(matrix) - 1:
         return False
     else:
         matrix[newY][newX] = matrix[y][x]
-        matrix[y][x] = "."  
+        matrix[y][x] = Position(0, ".")
     return True
         
+def getStatus():
+    string = "------------------------------------------------------------------------------------\n"
+    string += "Matriz de dimensão: " + str(dimension) + " x " + str(dimension) + "\n"
+    for p in persons:
+        string += repr(p) + "\n"
+    return string
+    
 
 threadLock = threading.Lock()
 dimension = 20
 rules = "3 4\n1 1 2 3\n2 3 1 2\n3 3 2 1\n1 2 3 1\n2 1 3 2\n3 2 1 3"
 
 # 1. Sets the matrix with specified dimension.
-matrix = [["."] * dimension for _ in range(dimension)]
+matrix = [[Position(0, ".")] * dimension for _ in range(dimension)]
 
 # 2. Read rules and prepare variables.
 rulesList = rules.split("\n")
@@ -132,7 +169,7 @@ while i < len(matrix):
         sizeRandomizer -= 1
     j = topPosition
     while j < bottomPosition:
-        matrix[j][i] = "O"
+        matrix[j][i] = Position(1, "O")
         usedPositions.append([i, j])
         obstaclePositions.append([i, j])
         j += 1
@@ -140,7 +177,6 @@ while i < len(matrix):
     
 # 3.2. Add each registry to a random not used position on the matrix 
 #      next to obstacles.
-
 for i in range(0, registrys):
     pos = obstaclePositions[randint(0, len(obstaclePositions) - 1)]
     if randint(0, 1) > 0:
@@ -153,7 +189,7 @@ for i in range(0, registrys):
             pos[0] += 1
         else: 
             pos[0] -= 1
-    matrix[pos[1]][pos[0]] = "R"
+    matrix[pos[1]][pos[0]] = Position(2, "R")
     usedPositions.append(pos)
     registryPositions.append(pos)
 
@@ -164,35 +200,108 @@ for i in range(0, len(persons)):
     while [x, y] in usedPositions:
         x = randint(0, len(matrix[0]) - 1)
         y = randint(0, len(matrix) - 1)
-    matrix[y][x] = "M" if persons[i].gender == Gender.MALE else "F"
+    matrix[y][x] = Position(3, "M") if persons[i].gender == Gender.MALE else Position(4, "F")
     persons[i].x = x
     persons[i].y = y
     usedPositions.append([x, y])
     
 # 4. Starts all agent threads
-#thread = Agent(0, 1)
-#thread.start()
-
-#for i in range(0, len(persons)):
-#    thread = Agent(i, 0.3)
-#    thread.start()
+for i in range(0, len(persons)):
+    thread = Agent(i, 0.2)
+    thread.start()
     
 #print(matrixToString(matrix), flush=True)
 #print("\n")
 
-testMatrix = matrix = [["."] * 20 for _ in range(20)]
-testMatrix[9][9] = "O"
-testMatrix[9][11] = "X"
-testMatrix[7][8] = "X"
-testMatrix[10][9] = "X"
-testMatrix[8][10] = "X"
-testMatrix[11][11] = "X"
-testMatrix[10][7] = "X"
+# -------TEST AREA-------
 
-checkNearbyPartners(testMatrix, "M", 9, 9)
-
-print(matrixToString(testMatrix))
+def aStarOk():
+    frontier = PriorityQueue()
+    frontier.put(start, 0)
+    came_from = {}
+    cost_so_far = {}
+    came_from[start] = None
+    cost_so_far[start] = 0
     
+    while not frontier.empty():
+        current = frontier.get()
+        
+        if current == goal:
+            break
+        
+        for next in graph.neighbors(current):
+            new_cost = cost_so_far(current) + graph.cost(current, next)
+            if next not in cost_so_far or new_cost < cost_so_far[next]:
+                cost_so_far[next] = new_cost
+                priority = new_cost + heuristic(goal, next)
+                frontier.put(next, priority)
+                came_from[next] = current
+
+def getNeighbors(matrix, x, y):
+    neighbors = []
+    for i in range(-2, 2):
+        for j in range(-2, 2):
+            if not matrix[i][j] == "O":
+                neighbors.append
+                
+def test():
+    os.system('cls' if os.name == 'nt' else 'clear')
+    testMatrix = [["-"] * 20 for _ in range(20)]
+    testMatrix[0][7] = "O"
+    testMatrix[1][7] = "O"
+    testMatrix[2][7] = "O"
+    testMatrix[3][7] = "O"
+    testMatrix[4][7] = "O"
+    testMatrix[5][7] = "O"
+    testMatrix[5][6] = "O"
+    testMatrix[5][5] = "O"
+    testMatrix[5][4] = "O"
+    testMatrix[5][3] = "O"
+    testMatrix[5][2] = "O"
+    testMatrix[14][14] = "O"
+    testMatrix[14][15] = "O"
+    testMatrix[14][16] = "O"
+    testMatrix[14][17] = "O"
+    testMatrix[14][19] = "O"
+    testMatrix[15][14] = "O"
+    testMatrix[16][14] = "O"
+    testMatrix[17][14] = "O"
+    testMatrix[18][14] = "O"
+    testMatrix[19][14] = "O"
+    testMatrix[10][11] = "O"
+    testMatrix[10][12] = "O"
+    testMatrix[9][12] = "O"
+    testMatrix[9][13] = "O"
+    testMatrix[8][13] = "O"
+    testMatrix[8][14] = "O"
+    testMatrix[7][14] = "O"
+    testMatrix[7][15] = "O"
+    testMatrix[6][15] = "O"
+    testMatrix[6][16] = "O"
+    testMatrix[5][16] = "O"
+    testMatrix[5][17] = "O"
+    testMatrix[4][17] = "O"
+    testMatrix[11][10] = "O"
+    testMatrix[11][11] = "O"
+    testMatrix[12][9] = "O"
+    testMatrix[12][10] = "O"
+    testMatrix[13][8] = "O"
+    testMatrix[13][9] = "O"
+    testMatrix[14][8] = "O"
+    testMatrix[15][8] = "O"
+    testMatrix[16][8] = "O"
+    testMatrix[17][8] = "O"
+    testMatrix[18][8] = "O"
+    testMatrix[19][8] = "O"
+    testMatrix[11][19] = "O"
+    testMatrix[11][18] = "O"
+    testMatrix[11][17] = "O"
+    testMatrix[11][16] = "O"
+    testMatrix[2][4] = "X"
+    testMatrix[17][17] = "Y"
+    print(matrixToString(testMatrix))
+                    
+                    
 from collections import deque
 
 class AStar:
