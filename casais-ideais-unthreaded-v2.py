@@ -60,10 +60,12 @@ class RulesReader(object):
         self.registrys = int(couplesRegistrys[1])
         self.persons = [self.translatePerson(x, Gender.MALE, ind) if ind < self.couples
            else self.translatePerson(x, Gender.FEMALE, ind) 
-           for ind, x in enumerate(rulesList[1:])]
+           for ind, x in enumerate(rulesList[1:]) if x.strip() != ""]
 
     def translatePerson(self, personString, gender, index):
-        return Agent(int(personString[0]), gender, list(map(lambda x: int(x), personString[2:].split(" "))), index)
+        personString = "".join(personString.split())
+        print(personString)
+        return Agent(int(personString[0]), gender, list(map(lambda x: int(x), list(personString[1:]))), index)
  
 class Agent(object):
     
@@ -79,14 +81,6 @@ class Agent(object):
         
     def __repr__(self):
         return "[Id: %s, Genero: %s, Parceiro atual: %s, Interesses: %s, I atual: %s, J atual: %s, Go reg: %s]" % (self.id, str(self.gender), self.partner, self.interests, self.i, self.j, self.goRegistry)
-
-    def getNeighbors(self, matrix):
-        self.neighbors = []
-        for i in range(-1, 2):
-            for j in range(-1, 2):
-                if 0 <= self.i - i < len(matrix) and 0 <= self.j - j < len(matrix):
-                    if not (i == 0 and j == 0) and matrix[self.i - i][self.j - j].name != "O":
-                        self.neighbors.append(matrix[self.i - i][self.j - j])
 
     def checkPartners(self, persons):
         for ind, p in enumerate(persons):
@@ -288,10 +282,25 @@ class Matrix(object):
                             if not (k == 0 and l == 0) and not self.matrix[j.i - k][j.j - l].name in ["O"]:#, PosType.REGISTRY, PosType.MALE, PosType.FEMALE]:
                                 j.neighbors.append(self.matrix[j.i - k][j.j - l])
 
+    def finish(self):
+        # TODO - Verify if no more couples can be formed
+        for p in self.persons:
+            pass
+
 
 os.system('cls' if os.name == 'nt' else 'clear')
-rulesString = "3 4\n1 1 2 3\n2 3 1 2\n3 3 2 1\n1 2 3 1\n2 1 3 2\n3 2 1 3"
-dimension = 20
+print("Welcome to kouplez!\nPlease inform the name of the file containing the desired rules to load.")
+print(os.listdir())
+rulesFile = input()
+print("File: " + rulesFile)
+with open(rulesFile) as f:
+    rulesString = f.readlines()
+rulesString[-1] = rulesString[-1].rstrip()
+rulesString = "".join(rulesString)
+print("Please inform the dimension of the matrix.")
+dimension = int(input())
+print("Dimension: " + str(dimension))
+#rulesString = "3 4\n1 1 2 3\n2 3 1 2\n3 3 2 1\n1 2 3 1\n2 1 3 2\n3 2 1 3"
 rules = RulesReader()
 rules.readRules(rulesString)
 mat = Matrix(dimension)
