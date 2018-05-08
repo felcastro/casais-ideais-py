@@ -194,12 +194,12 @@ class Matrix(object):
 
     def __repr__(self):
         string = '\n'.join([''.join(["" + str(j) + " " for j in i]) for i in self.matrix]) + "\n\n"
-        if self.couples < 5000:
+        if self.couples < 11:
             for p in self.persons:
                 string += repr(p) + "\n"
-        # else:
-        #     for p in self.persons:
-        #         string += "[" + str(p.id) + ", " + str(p.partner) + "], "
+        else:
+            for p in self.persons:
+                string += "[" + str(p.id) + ", " + str(p.partner) + "], "
         return string
 
     # Return a new empty matrix.
