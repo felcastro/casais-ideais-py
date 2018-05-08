@@ -62,10 +62,19 @@ class RulesReader(object):
            else self.translatePerson(x, Gender.FEMALE, ind) 
            for ind, x in enumerate(rulesList[1:]) if x.strip() != ""]
 
+    # Returns a Agent object from the string provided. 
     def translatePerson(self, personString, gender, index):
-        personString = "".join(personString.split())
-        print(personString)
-        return Agent(int(personString[0]), gender, list(map(lambda x: int(x), list(personString[1:]))), index)
+        personId = ""
+        for c in personString:
+            if not c in ["\t", " "]:
+                personId += c
+            else:
+                break
+        interests = personString[len(personId):].lstrip().rstrip()
+        interests = interests.split(" ")
+        interests = list(filter(lambda a: a != '', interests))
+        # personString = " ".join(personString[len(personId):].split(""))
+        return Agent(int(personId), gender, list(map(lambda x: int(x), interests)), index)
  
 class Agent(object):
     
@@ -82,6 +91,7 @@ class Agent(object):
     def __repr__(self):
         return "[Id: %s, Genero: %s, Parceiro atual: %s, Interesses: %s, I atual: %s, J atual: %s, Go reg: %s]" % (self.id, str(self.gender), self.partner, self.interests, self.i, self.j, self.goRegistry)
 
+    # Check if there is possible partner at a 360 degree 2 positions range on the matrix.
     def checkPartners(self, persons):
         for ind, p in enumerate(persons):
             if ind != self.index:
@@ -123,10 +133,11 @@ class Agent(object):
                             p.partner = self.id
                             p.goRegistry = True
 
+    # Move the agent to a random empty neighbor or to a specific position.
     def walk(self, matrix, i = None, j = None):
         step = []
         if i != None and j != None:
-            if matrix[i][j].name == "-":
+            if mat.matrix[i][j].name == "-":
                 step = [i, j]
         else:
             step = self.getNextStep(matrix)
@@ -134,44 +145,21 @@ class Agent(object):
             self.i = step[0]
             self.j = step[1]
 
+    # Returns a random position.
     def getNextStep(self, matrix):
-        step = self.getRandomMovement(matrix)
-        while matrix[step[0]][step[1]].name != "-":
-            step = self.getRandomMovement(matrix)
+        neighbors = [n for n in matrix.getNeighbors(self) if n.name == "-"]
+        rdmNeighbor = neighbors[randint(0, len(neighbors) - 1)]
+        step = [rdmNeighbor.i, rdmNeighbor.j]
         return step
 
-    def getRandomMovement(self, matrix):
-        newI = self.i
-        newJ = self.j
-        moveType = randint(0, 1)
-        if moveType == 0:
-            if newI <= 0: 
-                newI += 1
-            elif newI >= len(matrix[0]) - 1: 
-                newI -= 1
-            else:
-                if randint(0, 1) > 0:
-                    newI += 1
-                else:
-                    newI -= 1
-        else:
-            if newJ <= 0:
-                newJ += 1
-            elif newJ >= len(matrix) - 1:
-                newJ -= 1
-            else:
-                if randint(0, 1) > 0:
-                    newJ += 1
-                else:
-                    newJ -= 1
-        return [newI, newJ]
-
+    # Returns the index of the closest registry from the agent.
     def getClosestRegistry(self, registrys):
         regs = []
         for r in registrys:
             regs.append(math.hypot(r[0] - self.i, r[1] - self.j))
         return regs.index(min(regs))
 
+    # Bredth first algorithm to get best movement to a position from any position.
     def astar(self, start, matrix):
         frontier = Queue()
         frontier.put(start)
@@ -179,12 +167,13 @@ class Agent(object):
         came_from[start] = None
         while not frontier.empty():
             current = frontier.get()
-            for next in current.neighbors:
+            for next in matrix.getNeighbors(current):
                 if next not in came_from:
                     frontier.put(next)
                     came_from[next] = current
-        return came_from[matrix[self.i][self.j]]
+        return came_from[matrix.matrix[self.i][self.j]]
 
+    # Checks if one of the agent's neighbors are a registry.
     def isOnRegistry(self, registrys):
         for r in registrys:
             if self.i - 1 <= r[0] <= self.i + 1 and self.j - 1 <= r[1] <= self.j + 1:
@@ -207,8 +196,12 @@ class Matrix(object):
         if self.couples < 5:
             for p in self.persons:
                 string += repr(p) + "\n"
+        else:
+            for p in self.persons:
+                string += "[" + str(p.id) + ", " + str(p.partner) + "], "
         return string
 
+    # Return a new empty matrix.
     def newMatrix(self):
         matrix = []
         for i in range(self.dimension):
@@ -219,6 +212,7 @@ class Matrix(object):
                 matrix[i][j].j = j
         return matrix
 
+    # Randomly sets all obstacles on the matrix.
     def setObstacles(self):
         self.obstacles = []
         matrixHalf = int(round(self.dimension / 2))
@@ -242,6 +236,7 @@ class Matrix(object):
                 j += 1
             i += obstacleSpacing
 
+    # Randomly sets all registrys by the obstacles.
     def setRegistrys(self, registrys):
         self.registrys = []
         for i in range(registrys):
@@ -259,6 +254,7 @@ class Matrix(object):
             self.matrix[pos[0]][pos[1]].name = "R"
             self.registrys.append(pos)
 
+    # Randomly set all persons on the matrix.
     def setPersons(self, persons):
         self.persons = persons
         i = randint(0, self.dimension - 1)
@@ -272,26 +268,36 @@ class Matrix(object):
             p.i = i
             p.j = j
 
+    # Move a person from a position to its position.
     def movePerson(self, person, pos):
         self.matrix[pos[0]][pos[1]].name = "-"
         self.matrix[person.i][person.j].name = "M" if person.gender == Gender.MALE else "F"
 
-    def updateNeighbors(self):
-        for i in self.matrix:
-            for j in i:
-                j.neighbors = []
-                for k in range(-1, 2):
-                    for l in range(-1, 2):
-                        if 0 <= j.i - k < self.dimension and 0 <= j.j - l < self.dimension:
-                            if not (k == 0 and l == 0) and not self.matrix[j.i - k][j.j - l].name in ["O"]:
-                                j.neighbors.append(self.matrix[j.i - k][j.j - l])
+    # Return all valid neighbors of a position
+    def getNeighbors(self, pos):
+        neighbors = []
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                if 0 <= pos.i - i < self.dimension and 0 <= pos.j - j < self.dimension:
+                    if not (i == 0 and j == 0) and not self.matrix[pos.i - i][pos.j - j].name in ["O"]:
+                        neighbors.append(self.matrix[pos.i - i][pos.j - j])
+        return neighbors
 
+    # Verify if maximum combination of couples was formed.
     def finish(self):
-        # TODO - Verify if no more couples can be formed
-        for p in self.persons:
-            pass
+        for pOne in self.persons:
+            if pOne.partner == 0:
+                return False
+            if pOne.partner != pOne.interests[0]:
+                for pTwo in self.persons:
+                    if pOne != pTwo and pOne.gender != pTwo.gender:
+                        if pTwo.partner == 0:
+                            return False
+                        if pTwo.interests.index(pOne.id) < pTwo.interests.index(pTwo.partner) and pOne.interests.index(pTwo.id) < pOne.interests.index(pOne.partner):
+                            return False
+        return True
 
-
+# Collect information from user to run the code.
 os.system('cls' if os.name == 'nt' else 'clear')
 print("Welcome to kouplez!\nPlease inform the name of the file containing the desired rules to load. (default = 3Casais.txt)")
 print(os.listdir("Rules"))
@@ -309,32 +315,34 @@ if dimension == "":
     dimension = 20
 dimension = int(dimension)
 print("Dimension: " + str(dimension))
-#rulesString = "3 4\n1 1 2 3\n2 3 1 2\n3 3 2 1\n1 2 3 1\n2 1 3 2\n3 2 1 3"
+
+# Prepare the environment.
 rules = RulesReader()
 rules.readRules(rulesString)
 mat = Matrix(dimension, rules.couples)
 mat.setObstacles()
 mat.setRegistrys(rules.registrys)
 mat.setPersons(rules.persons)
-mat.updateNeighbors()
 
-while True:
+# Run agents on environment.
+finished = False
+while not finished:
     for p in mat.persons:
         oldPos = [p.i, p.j]
         if p.goRegistry and not p.isOnRegistry(mat.registrys):
             reg = p.getClosestRegistry(mat.registrys)
             reg = mat.registrys[reg]
-            path = p.astar(mat.matrix[reg[0]][reg[1]], mat.matrix)
+            path = p.astar(mat.matrix[reg[0]][reg[1]], mat)
             p.walk(mat.matrix, path.i, path.j)
         else:
-            p.walk(mat.matrix)
+            p.walk(mat)
         mat.movePerson(p, oldPos)
-        mat.updateNeighbors()
         try:
             p.checkPartners(mat.persons)
         except:
             pass
         os.system('cls' if os.name == 'nt' else 'clear')
         print(str(mat))
-        # time.sleep(0.01)
-
+        finished = mat.finish()
+        # time.sleep(0.03)
+print("Casais máximos formados!")

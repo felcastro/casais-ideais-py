@@ -6,19 +6,22 @@ import os
 import math
 import collections
 
-class Queue:
+class PriorityQueue:
         
     def __init__(self):
-        self.elements = collections.deque()
+        self.elements = []
 
     def empty(self):
         return len(self.elements) == 0
 
-    def put(self, x):
-        self.elements.append(x)
+    def put(self, x, priority):
+        self.elements.append([x, priority])
+        self.elements.sort(key=lambda x: x[1], reverse=True)
 
     def get(self):
-        return self.elements.popleft()
+        x = self.elements[-1]
+        self.elements = self.elements[:-1]
+        return x[0]
 
 class Gender(Enum):
     MALE = 0
@@ -33,6 +36,7 @@ class Position(object):
         self.name = name
         self.i = 0
         self.j = 0
+        self.g = 1
         self.neighbors = []
     
     def __repr__(self):
@@ -50,6 +54,9 @@ class Position(object):
         else:
             string = self.name
         return string
+
+    def toStr(self):
+        return "[" + str(self.i) + ", " + str(self.j) + "]"
 
 class RulesReader(object):
 
@@ -124,15 +131,12 @@ class Agent(object):
                             p.goRegistry = True
 
     def walk(self, matrix, i = None, j = None):
-        step = []
         if i != None and j != None:
-            if matrix[i][j].name == "-":
-                step = [i, j]
+            step = [i, j]
         else:
             step = self.getNextStep(matrix)
-        if step != []:
-            self.i = step[0]
-            self.j = step[1]
+        self.i = step[0]
+        self.j = step[1]
 
     def getNextStep(self, matrix):
         step = self.getRandomMovement(matrix)
@@ -172,18 +176,30 @@ class Agent(object):
             regs.append(math.hypot(r[0] - self.i, r[1] - self.j))
         return regs.index(min(regs))
 
-    def astar(self, start, matrix):
-        frontier = Queue()
-        frontier.put(start)
+    def astar2(self, start, goal):
+        frontier = PriorityQueue()
+        frontier.put(start, 0)
         came_from = {}
+        cost_so_far = {}
         came_from[start] = None
+        cost_so_far[start] = 0
         while not frontier.empty():
             current = frontier.get()
+
+            if current == goal:
+                break
+            
             for next in current.neighbors:
-                if next not in came_from:
-                    frontier.put(next)
+                new_cost = cost_so_far[current] + current.g
+                if next not in cost_so_far or new_cost < cost_so_far[next]:
+                    cost_so_far[next] = new_cost
+                    priority = new_cost + self.heuristic(goal, next)
+                    frontier.put(next, priority)
                     came_from[next] = current
-        return came_from[matrix[self.i][self.j]]
+        return came_from
+    
+    def heuristic(self, goal, next):
+        return math.sqrt(math.pow(goal.i - next.i, 2) + math.pow(goal.j - next.j, 2))
 
     def isOnRegistry(self, registrys):
         for r in registrys:
@@ -283,7 +299,7 @@ class Matrix(object):
                 for k in range(-1, 2):
                     for l in range(-1, 2):
                         if 0 <= j.i - k < self.dimension and 0 <= j.j - l < self.dimension:
-                            if not (k == 0 and l == 0) and not self.matrix[j.i - k][j.j - l].name in ["O"]:
+                            if not (k == 0 and l == 0) and not self.matrix[j.i - k][j.j - l].name in ["O", "M", "F"]:
                                 j.neighbors.append(self.matrix[j.i - k][j.j - l])
 
     def finish(self):
@@ -291,7 +307,7 @@ class Matrix(object):
         for p in self.persons:
             pass
 
-
+# Collect information to run the code.
 os.system('cls' if os.name == 'nt' else 'clear')
 print("Welcome to kouplez!\nPlease inform the name of the file containing the desired rules to load. (default = 3Casais.txt)")
 print(os.listdir("Rules"))
@@ -309,7 +325,8 @@ if dimension == "":
     dimension = 20
 dimension = int(dimension)
 print("Dimension: " + str(dimension))
-#rulesString = "3 4\n1 1 2 3\n2 3 1 2\n3 3 2 1\n1 2 3 1\n2 1 3 2\n3 2 1 3"
+
+# Prepare the environment.
 rules = RulesReader()
 rules.readRules(rulesString)
 mat = Matrix(dimension, rules.couples)
@@ -318,14 +335,21 @@ mat.setRegistrys(rules.registrys)
 mat.setPersons(rules.persons)
 mat.updateNeighbors()
 
+# Run agents on environment.
 while True:
     for p in mat.persons:
         oldPos = [p.i, p.j]
         if p.goRegistry and not p.isOnRegistry(mat.registrys):
             reg = p.getClosestRegistry(mat.registrys)
             reg = mat.registrys[reg]
-            path = p.astar(mat.matrix[reg[0]][reg[1]], mat.matrix)
-            p.walk(mat.matrix, path.i, path.j)
+            # print(mat.matrix[p.i][p.j])
+            # print(mat.matrix[p.i][p.j].neighbors)
+            # print(mat.matrix[reg[0]][reg[1]])
+            path = p.astar2(mat.matrix[p.i][p.j], mat.matrix[reg[0]][reg[1]])
+            print(str(path))
+            time.sleep(100)
+            # print(path[0].toStr())
+            p.walk(mat.matrix, path[0].i, path[0].j)
         else:
             p.walk(mat.matrix)
         mat.movePerson(p, oldPos)
@@ -336,5 +360,5 @@ while True:
             pass
         os.system('cls' if os.name == 'nt' else 'clear')
         print(str(mat))
-        # time.sleep(0.01)
+        time.sleep(0.03)
 
