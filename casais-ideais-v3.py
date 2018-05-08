@@ -93,45 +93,44 @@ class Agent(object):
 
     # Check if there is possible partner at a 360 degree 2 positions range on the matrix.
     def checkPartners(self, persons):
-        for ind, p in enumerate(persons):
-            if ind != self.index:
-                if self.id != p.id and self.gender != p.gender:
-                    if self.i - 2 <= p.i <= self.i + 2 and self.j - 2 <= p.j <= self.j + 2:
-                        if self.partner == 0 and p.partner == 0:
-                            self.partner = p.id
-                            self.goRegistry = True
-                            p.partner = self.id
-                            p.goRegistry = True
-                        elif self.partner == 0 and p.interests.index(self.id) < p.interests.index(p.partner):
-                            for prsn in persons:
-                                if prsn.id == p.partner and prsn.gender != p.gender:
-                                    prsn.partner = 0
-                                    prsn.goRegistry = False
-                            self.partner = p.id
-                            self.goRegistry = True
-                            p.partner = self.id
-                            p.goRegistry = True
-                        elif p.partner == 0 and self.interests.index(p.id) < self.interests.index(self.partner):
-                            for prsn in persons:
-                                if prsn.id == self.partner and prsn.gender != self.gender:
-                                    prsn.partner = 0
-                                    prsn.goRegistry = False
-                            self.partner = p.id
-                            self.goRegistry = True
-                            p.partner = self.id
-                            p.goRegistry = True
-                        elif self.interests.index(p.id) < self.interests.index(self.partner) and p.interests.index(self.id) < p.interests.index(p.partner):
-                            for prsn in persons:
-                                if prsn.id == p.partner and prsn.gender != p.gender:
-                                    prsn.partner = 0
-                                    prsn.goRegistry = False
-                                elif prsn.id == self.partner and prsn.gender != self.gender:
-                                    prsn.partner = 0
-                                    prsn.goRegistry = False
-                            self.partner = p.id
-                            self.goRegistry = True
-                            p.partner = self.id
-                            p.goRegistry = True
+        for p in persons:
+            if self.id != p.id and self.gender != p.gender:
+                if self.i - 2 <= p.i <= self.i + 2 and self.j - 2 <= p.j <= self.j + 2:
+                    if self.partner == 0 and p.partner == 0:
+                        self.partner = p.id
+                        self.goRegistry = True
+                        p.partner = self.id
+                        p.goRegistry = True
+                    elif self.partner == 0 and p.interests.index(self.id) < p.interests.index(p.partner):
+                        for prsn in persons:
+                            if prsn.id == p.partner and prsn.gender != p.gender:
+                                prsn.partner = 0
+                                prsn.goRegistry = False
+                        self.partner = p.id
+                        self.goRegistry = True
+                        p.partner = self.id
+                        p.goRegistry = True
+                    elif p.partner == 0 and self.interests.index(p.id) < self.interests.index(self.partner):
+                        for prsn in persons:
+                            if prsn.id == self.partner and prsn.gender != self.gender:
+                                prsn.partner = 0
+                                prsn.goRegistry = False
+                        self.partner = p.id
+                        self.goRegistry = True
+                        p.partner = self.id
+                        p.goRegistry = True
+                    elif self.interests.index(p.id) < self.interests.index(self.partner) and p.interests.index(self.id) < p.interests.index(p.partner):
+                        for prsn in persons:
+                            if prsn.id == p.partner and prsn.gender != p.gender:
+                                prsn.partner = 0
+                                prsn.goRegistry = False
+                            elif prsn.id == self.partner and prsn.gender != self.gender:
+                                prsn.partner = 0
+                                prsn.goRegistry = False
+                        self.partner = p.id
+                        self.goRegistry = True
+                        p.partner = self.id
+                        p.goRegistry = True
 
     # Move the agent to a random empty neighbor or to a specific position.
     def walk(self, matrix, i = None, j = None):
@@ -147,9 +146,11 @@ class Agent(object):
 
     # Returns a random position.
     def getNextStep(self, matrix):
+        step = []
         neighbors = [n for n in matrix.getNeighbors(self) if n.name == "-"]
-        rdmNeighbor = neighbors[randint(0, len(neighbors) - 1)]
-        step = [rdmNeighbor.i, rdmNeighbor.j]
+        if len(neighbors) - 1 > 0:
+            rdmNeighbor = neighbors[randint(0, len(neighbors) - 1)]
+            step = [rdmNeighbor.i, rdmNeighbor.j]
         return step
 
     # Returns the index of the closest registry from the agent.
@@ -193,12 +194,12 @@ class Matrix(object):
 
     def __repr__(self):
         string = '\n'.join([''.join(["" + str(j) + " " for j in i]) for i in self.matrix]) + "\n\n"
-        if self.couples < 5:
+        if self.couples < 5000:
             for p in self.persons:
                 string += repr(p) + "\n"
-        else:
-            for p in self.persons:
-                string += "[" + str(p.id) + ", " + str(p.partner) + "], "
+        # else:
+        #     for p in self.persons:
+        #         string += "[" + str(p.id) + ", " + str(p.partner) + "], "
         return string
 
     # Return a new empty matrix.
